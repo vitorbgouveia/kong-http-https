@@ -61,8 +61,8 @@ services:
       - "./kong/kong.conf:/etc/kong/kong.conf"
       - "kong:/usr/local"
     ports:
-      - "9002:8000/tcp"
-      - "9001:8001/tcp"
+      - "8000:8000/tcp"
+      - "8001:8001/tcp"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -95,8 +95,8 @@ services:
       - "./kong-https/kong.conf:/etc/kong/kong.conf"
       - "kong_https:/usr/local"
     ports:
-      - "9022:8443/tcp"
-      - "9011:8001/tcp"
+      - "8443:8443/tcp"
+      - "8001:8001/tcp"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
