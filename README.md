@@ -4,7 +4,7 @@
 
 kong-http-https
 =========================
-* Esse repositório contém um arquivo docker-compose para intalação completa e inegração com requisições http e https.
+* Esse repositório contém um arquivo docker-compose para intalação completa e integração com requisições http e https.
 * Para requisições http utilizar a porta 8000.
 * Para requisições https utilizar a porta 8443.
 
