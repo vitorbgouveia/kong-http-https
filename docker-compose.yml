@@ -1,0 +1,150 @@
+version: '3.7'
+
+services:
+
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_DB: kong
+      POSTGRES_PASSWORD: kong
+    networks:
+      - kong-net
+    volumes:
+      - "kong_data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "-kong"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: always
+  
+  kong-migrations:
+    image: kong
+    container_name: kong-migration
+    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
+    depends_on:
+      - kong-database
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    networks:
+      - kong-net
+    restart: always
+
+  kong:
+    build: ./kong
+    container_name: kong
+    user: kong
+    depends_on:
+      - kong-migrations
+      - kong-database
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: '0.0.0.0:8001'
+      KONG_CASSANDRA_CONTACT_POINTS: kong-database
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PG_PASSWORD: kong
+    networks:
+      - kong-net
+    volumes:
+      - "./kong/kong.conf:/etc/kong/kong.conf"
+      - "kong:/usr/local"
+    ports:
+      - "9002:8000/tcp"
+      - "9001:8001/tcp"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: always
+
+  kong-https:
+    build: ./kong-https
+    container_name: kong-https
+    user: kong
+    depends_on:
+      - kong-migrations
+      - kong-database
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: '0.0.0.0:8001'
+      KONG_CASSANDRA_CONTACT_POINTS: kong-database
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PG_PASSWORD: kong
+    networks:
+      - kong-net
+    volumes:
+      - "./kong-https/kong.conf:/etc/kong/kong.conf"
+      - "kong_https:/usr/local"
+    ports:
+      - "9022:8443/tcp"
+      - "9011:8001/tcp"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: always
+
+  konga-database:
+    image: mongo
+    container_name: konga-database
+    volumes:
+      - konga_data:/data/
+    healthcheck:
+      test: echo 'db.stats().ok' | mongo localhost:27017/konga --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: 
+      - kong-net
+  
+  konga:
+    image: pantsel/konga
+    container_name: konga
+    depends_on:
+      - konga-database
+      - kong
+    ports:
+      - 9003:1337
+    environment:
+      DB_ADAPTER: mongo
+      DB_DATABASE: konga
+      DB_HOST: konga-database
+      KONGA_SEED_USER_DATA_SOURCE_FILE: /app/user_seed.js
+      NODE_ENV: production
+    restart: always
+    networks: 
+      - kong-net
+    volumes:
+      - ./user_seed.js:/app/user_seed.js:ro
+
+volumes:
+  kong_data:
+  kong:
+  kong_data_https:
+  kong_https:
+  konga_data:
+
+networks:
+  kong-net:
+    external:
+      name: kong-network
